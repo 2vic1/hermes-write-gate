@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "glob": "**/*.json",
+      "syntax": "json",
+      "max_lines": 2000
+    },
+    {
+      "glob": "config/*.json",
+      "required": ["\"version\"", "\"name\""],
+      "forbidden": ["TODO\\(unimplemented\\)"]
+    },
+    {
+      "glob": "secrets/**",
+      "forbidden": ["sk-[A-Za-z0-9]{24,}", "ghp_[A-Za-z0-9]{30,}", "AKIA[0-9A-Z]{16}"]
+    },
+    {
+      "glob": "**/*.py",
+      "syntax": "python",
+      "forbidden": ["subprocess\\.Popen\\([^)]*shell\\s*=\\s*True"]
+    },
+    {
+      "glob": "**/*.toml",
+      "syntax": "toml",
+      "max_bytes": 65536
+    }
+  ]
+}
