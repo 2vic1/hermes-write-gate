@@ -1,0 +1,37 @@
+name: write-gate
+version: 1.0.0
+manifest_version: 2
+api_version: 1
+description: >-
+  Deterministic pre-write content gate. Blocks invalid JSON, TOML and Python,
+  NUL bytes, oversized files and user-declared regex contracts before a file
+  write happens, returning a precise, actionable error to the model so it can
+  fix the content inside the same tool-calling loop.
+author: 2vic1
+license: MIT
+homepage: https://github.com/2vic1/hermes-write-gate
+tags: [tools, validation, safety, developer]
+requires_hermes: ">=0.21.5"
+
+provides_tools:
+  - write_gate_check
+provides_hooks:
+  - pre_tool_call
+
+config_schema:
+  enabled:
+    type: bool
+    default: true
+    label: Enabled
+    description: Gate all file-write tool calls.
+  mode:
+    type: str
+    choices: [enforce, observe]
+    default: enforce
+    label: Mode
+    description: enforce blocks bad writes; observe only reports them via the check tool.
+  rules_file:
+    type: str
+    default: ""
+    label: Rules file
+    description: Optional absolute path to a JSON rules file with per-glob contracts.
