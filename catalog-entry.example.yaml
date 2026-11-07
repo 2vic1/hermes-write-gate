@@ -1,0 +1,29 @@
+# Add this file to NousResearch/hermes-agent as plugin-catalog/write-gate.yaml.
+# Replace `sha` with the full 40-character commit SHA of THIS repository, and
+# `docs_url` / `image` with the real values at that SHA.
+name: write-gate
+title: Write Gate
+repo: https://github.com/2vic1/hermes-write-gate
+sha: "0000000000000000000000000000000000000000"
+description: >-
+  Deterministic pre-write content gate: blocks invalid JSON, TOML and Python,
+  NUL bytes, oversized content and user-declared regex contracts before a file
+  write, returning exact line/column errors to the model so it fixes the content
+  in the same tool-calling loop. Disclosure — no network calls, no shell
+  commands, no credentials, no telemetry; optionally reads one user-specified
+  JSON rules file; persists three integer counters in profile-scoped plugin
+  state.
+maintainer: 2vic1
+tier: community
+category: tools
+requires_hermes: ">=0.21.5"
+version: "1.0.0"
+docs_url: https://github.com/2vic1/hermes-write-gate#readme
+platforms: []
+capabilities:
+  provides_tools:
+    - write_gate_check
+  provides_hooks:
+    - pre_tool_call
+  provides_middleware: []
+  requires_env: []
