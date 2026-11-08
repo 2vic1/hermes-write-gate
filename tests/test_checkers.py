@@ -96,6 +96,72 @@ class RuleContracts(unittest.TestCase):
         self.assertLessEqual(len(issues), checkers.MAX_ISSUES)
 
 
+class FragmentChecks(unittest.TestCase):
+    """Replacement fragments are not whole documents (review on PR #150594)."""
+
+    def test_indented_python_fragment_is_not_parsed(self):
+        self.assertEqual(
+            checkers.check("    return x", "m.py", [], fragment=True), []
+        )
+
+    def test_json_member_fragment_is_not_parsed(self):
+        self.assertEqual(
+            checkers.check('"a": 1,', "a.json", [], fragment=True), []
+        )
+
+    def test_toml_fragment_is_not_parsed(self):
+        self.assertEqual(
+            checkers.check("= 1", "c.toml", [], fragment=True), []
+        )
+
+    def test_whole_document_is_still_parsed_by_default(self):
+        issues = checkers.check("    return x", "m.py", [])
+        self.assertTrue(any("invalid Python" in i for i in issues))
+
+    def test_nul_and_size_checks_still_apply_to_fragments(self):
+        issues = checkers.check("ok\x00bad", "m.py", [], fragment=True)
+        self.assertTrue(any("NUL" in i for i in issues))
+        big = checkers.check(
+            "x" * (checkers.MAX_CONTENT_BYTES + 1), "m.py", [], fragment=True
+        )
+        self.assertTrue(any("safety cap" in i for i in big))
+
+    def test_rule_contracts_still_apply_to_fragments(self):
+        rules = [{"glob": "**", "forbidden": ["SECRET"]}, {"glob": "**", "syntax": "json"}]
+        issues = checkers.check("SECRET", "m.py", rules, fragment=True)
+        self.assertTrue(any("forbidden pattern" in i for i in issues))
+        # A syntax override must not be applied to a fragment either.
+        self.assertFalse(any("invalid JSON" in i for i in issues))
+
+    def test_post_edit_document_is_parsed_instead(self):
+        issues = checkers.check(
+            '"a": 1,',
+            "a.json",
+            [],
+            fragment=True,
+            post_content='{"a": 1,}',
+        )
+        self.assertTrue(any("post-edit file would be invalid" in i for i in issues))
+
+    def test_valid_post_edit_document_passes(self):
+        self.assertEqual(
+            checkers.check(
+                '"a": 1,',
+                "a.json",
+                [],
+                fragment=True,
+                post_content='{"a": 1, "b": 2}',
+            ),
+            [],
+        )
+
+    def test_no_reconstruction_means_no_syntax_check(self):
+        self.assertEqual(
+            checkers.check("    return x", "m.py", [], fragment=True, post_content=None),
+            [],
+        )
+
+
 class RulesLoading(unittest.TestCase):
     def test_missing_file_is_safe(self):
         self.assertEqual(checkers.load_rules(""), [])

@@ -75,6 +75,19 @@ def _syntax_for(path: str) -> str | None:
     return _SYNTAX_BY_SUFFIX.get(_suffix(path))
 
 
+def syntax_issues(text: str, path: str, prefix: str = "") -> list[str]:
+    """Parse a *whole document*. Never call this on a replacement fragment.
+
+    A fragment such as ``    return x`` or ``"a": 1,`` is not a document, so
+    feeding it to json.loads / tomllib.loads / ast.parse produces a guaranteed
+    false positive. Callers must pass the complete file instead.
+    """
+    syntax = _syntax_for(path)
+    if not syntax:
+        return []
+    return [prefix + issue for issue in _PARSERS[syntax](text)]
+
+
 def load_rules(rules_path: str) -> list[dict]:
     """Load optional per-glob contracts. Never raises."""
     if not rules_path:
@@ -89,12 +102,11 @@ def load_rules(rules_path: str) -> list[dict]:
     return [r for r in rules if isinstance(r, dict)]
 
 
-def _apply_rule(text: str, rule: dict) -> list[str]:
+def _apply_rule(text: str, rule: dict, parse_syntax: bool = True) -> list[str]:
     issues: list[str] = []
-    glob = str(rule.get("glob") or "**")
 
     syntax = rule.get("syntax")
-    if syntax and syntax in _PARSERS:
+    if parse_syntax and syntax and syntax in _PARSERS:
         issues.extend(_PARSERS[syntax](text))
 
     max_lines = rule.get("max_lines")
@@ -136,12 +148,25 @@ def _apply_rule(text: str, rule: dict) -> list[str]:
     return issues
 
 
-def check(content: str, path: str, rules: list[dict] | None = None) -> list[str]:
+def check(
+    content: str,
+    path: str,
+    rules: list[dict] | None = None,
+    *,
+    fragment: bool = False,
+    post_content: str | None = None,
+) -> list[str]:
     """Return a list of human-readable problems. Empty list means the write is safe.
 
     The error strings are shown verbatim to the model, so they carry the exact
     line/column and the exact failing contract. That is what makes the retry
     converge instead of guessing.
+
+    ``fragment=True`` means ``content`` is a replacement fragment (new_string),
+    not a whole file. Whole-document parsers are then never run on it. If
+    ``post_content`` is supplied (the reconstructed file after the edit), that
+    full document is parsed instead. NUL, size and regex/size/line contracts
+    always run on ``content`` itself.
     """
     issues: list[str] = []
 
@@ -154,14 +179,17 @@ def check(content: str, path: str, rules: list[dict] | None = None) -> list[str]
             "{} bytes exceeds the {} byte safety cap".format(size, MAX_CONTENT_BYTES)
         )
 
-    syntax = _syntax_for(path)
-    if syntax:
-        issues.extend(_PARSERS[syntax](content))
+    if not fragment:
+        issues.extend(syntax_issues(content, path))
+    elif post_content is not None:
+        issues.extend(
+            syntax_issues(post_content, path, "post-edit file would be invalid: ")
+        )
 
     for rule in rules or []:
         glob = str(rule.get("glob") or "**")
         if fnmatch.fnmatch(path, glob) or fnmatch.fnmatch(_suffix(path), glob):
-            issues.extend(_apply_rule(content, rule))
+            issues.extend(_apply_rule(content, rule, parse_syntax=not fragment))
 
     # De-duplicate while preserving order, then bound the payload size.
     seen: set[str] = set()

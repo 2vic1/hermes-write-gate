@@ -9,10 +9,12 @@ description: >-
   Deterministic pre-write content gate: blocks invalid JSON, TOML and Python,
   NUL bytes, oversized content and user-declared regex contracts before a file
   write, returning exact line/column errors to the model so it fixes the content
-  in the same tool-calling loop. Disclosure — no network calls, no shell
-  commands, no credentials, no telemetry; optionally reads one user-specified
-  JSON rules file; persists three integer counters in profile-scoped plugin
-  state.
+  in the same tool-calling loop. Patch/replacement fragments are never parsed
+  as whole documents; the post-edit file is parsed when it can be rebuilt.
+  Disclosure — no network calls, no shell commands, no credentials, no
+  telemetry; optionally reads one user-specified JSON rules file plus the
+  patched target file (read-only, 2 MB cap); persists three integer counters
+  in profile-scoped plugin state.
 maintainer: 2vic1
 tier: community
 category: tools

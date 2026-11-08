@@ -29,6 +29,26 @@ Contracts support `glob`, `syntax`, `max_lines`, `max_bytes`, `required[]` and
 `forbidden[]` as regular expressions. See [`rules.example.json`](rules.example.json).
 An invalid regex is reported as a rule error rather than crashing the agent.
 
+## Patch / fragment edits
+
+`patch`, `replace_in_file` and `edit_file` carry a *replacement fragment*, not a
+whole file. A fragment such as `    return x` or `"a": 1,` is not a document, so
+running a whole-file parser on it would produce a guaranteed false positive and
+effectively switch off patching `.py`, `.json` and `.toml` files.
+
+For those calls the gate:
+
+- never runs whole-document parsers on the fragment (including `syntax` rules);
+- still runs the NUL, size and regex/line/byte contract checks on the fragment;
+- when `old_string` + `new_string` are present and the target file can be read,
+  reconstructs the **post-edit** file in memory and parses that instead. A patch
+  that would leave the file broken is still refused, with a `post-edit file
+  would be invalid: ...` error.
+
+Reconstruction is best-effort and read-only: if the file is missing, too large,
+unreadable, or `old_string` is not found, the syntax check is skipped (fail
+open) rather than blocking a legitimate edit. No file is written by the gate.
+
 ## Surfaces used
 
 - native `plugin.yaml` + `register(ctx)`
@@ -92,7 +112,8 @@ costs zero tokens when nothing is wrong.
 - Every hook callback accepts `**kwargs` and is wrapped in `try/except`.
 - The gate fails **open**: if anything in the plugin breaks, Hermes carries on.
 - `checkers.py` has no Hermes imports and is unit-tested independently:
-  `python -m unittest discover -s tests -v`.
+  `python -m unittest discover -s tests -v` (51 tests, including patch/fragment
+  regression coverage).
 - Validated with `hermes plugins validate . --install-deps` and
   `hermes plugins doctor . --ci`.
 
@@ -100,10 +121,13 @@ costs zero tokens when nothing is wrong.
 
 - **Network calls to third-party services:** none. The plugin makes no network
   calls of any kind.
-- **Reads outside the plugin's own data:** only an optional, user-specified
-  JSON rules file named in the `rules_file` setting. Plugin code otherwise reads
-  only the in-memory arguments of the tool call it is gating. It never reads
-  `.env`, `auth.json`, credential stores, other profiles or session databases.
+- **Reads outside the plugin's own data:** an optional, user-specified JSON
+  rules file named in the `rules_file` setting, and — for fragment edits only —
+  the target file named in the tool call's own `path` argument, read once (size
+  capped at 2 MB) to reconstruct the post-edit file for a syntax check. That
+  read is best-effort and never writes. Plugin code otherwise reads only the
+  in-memory arguments of the tool call it is gating. It never reads `.env`,
+  `auth.json`, credential stores, other profiles or session databases.
 - **Shell commands:** none. No subprocesses are started.
 - **Long-running background processes:** none.
 - **Stored credentials:** none. No secrets are read, written or forwarded.

@@ -6,7 +6,9 @@ description: >-
   Deterministic pre-write content gate. Blocks invalid JSON, TOML and Python,
   NUL bytes, oversized files and user-declared regex contracts before a file
   write happens, returning a precise, actionable error to the model so it can
-  fix the content inside the same tool-calling loop.
+  fix the content inside the same tool-calling loop. Patch fragments are never
+  parsed as whole documents; the reconstructed post-edit file is parsed when
+  available.
 author: 2vic1
 license: MIT
 homepage: https://github.com/2vic1/hermes-write-gate
